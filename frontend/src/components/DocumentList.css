@@ -1,0 +1,11 @@
+.table.table-bordered tbody tr.selected-item,
+.table.table-bordered tbody tr.selected-item td,
+.table-hover tbody tr.selected-item:hover,
+.table-hover tbody tr.selected-item:hover td {
+  background-color: #cce5ff !important;
+}
+
+.table.table-bordered tr {
+  pointer-events: auto;
+  user-select: auto;
+}

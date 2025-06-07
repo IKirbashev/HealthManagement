@@ -4,11 +4,12 @@ const Schema = mongoose.Schema;
 
 const RecordTypeSchema = new Schema({
   userId: { type: String, required: true },
-  name: { type: String, required: true, maxlength: 50 },
-  isCustom: { type: Boolean, default: true },
+  name: { 
+    type: String, 
+    required: true, 
+    maxlength: 50,
+    match: [/^[\p{L}\p{N}\s]+$/u, 'Название типа должно содержать только буквы, цифры и пробелы']
+  },
 });
-
-// Unique index to prevent duplicate type names for the same user
-RecordTypeSchema.index({ userId: 1, name: 1 }, { unique: true });
 
 module.exports = mongoose.model('RecordType', RecordTypeSchema);

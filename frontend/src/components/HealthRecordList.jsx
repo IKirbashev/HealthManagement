@@ -18,9 +18,42 @@ const HealthRecordList = () => {
   const [searchDescription, setSearchDescription] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [recordTypes, setRecordTypes] = useState([]);
-  const [sortOrder, setSortOrder] = useState('desc'); // Default: newest first
   const tableRef = useRef(null);
   const navigate = useNavigate();
+
+  const fetchRecords = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('http://localhost:3000/api/health-records', {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { sort: localStorage.getItem('sortOrder') || 'desc' },
+      });
+      const data = response.data || [];
+      setRecords(data);
+      setFilteredRecords(data);
+    } catch (err) {
+      console.error('Failed to fetch records:', err);
+      if (err.response?.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/login');
+      }
+      setRecords([]);
+      setFilteredRecords([]);
+    }
+  };
+
+  const fetchRecordTypes = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('http://localhost:3000/api/health-records/types', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setRecordTypes(response.data || []);
+    } catch (err) {
+      console.error('Failed to fetch record types:', err);
+      setRecordTypes([]);
+    }
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -29,59 +62,24 @@ const HealthRecordList = () => {
       return;
     }
 
-    const fetchRecords = async () => {
-      try {
-        const response = await axios.get('http://localhost:3000/api/health-records', {
-          headers: { Authorization: `Bearer ${token}` },
-          params: { sort: sortOrder === 'asc' ? 'date' : '-date' }, // Sort by date
-        });
-        const data = response.data || [];
-        setRecords(data);
-        setFilteredRecords(data);
-      } catch (err) {
-        console.error('Failed to fetch records:', err);
-        if (err.response?.status === 401) {
-          localStorage.removeItem('token');
-          navigate('/login');
-        }
-        setRecords([]);
-        setFilteredRecords([]);
-      }
-    };
-
-    const fetchRecordTypes = async () => {
-      try {
-        const response = await axios.get('http://localhost:3000/api/health-records/types', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setRecordTypes(response.data || []);
-      } catch (err) {
-        console.error('Failed to fetch record types:', err);
-        setRecordTypes([]);
-      }
-    };
-
     fetchRecords();
     fetchRecordTypes();
-  }, [navigate, sortOrder]); // Re-fetch when sortOrder changes
+  }, [navigate]);
 
   useEffect(() => {
     try {
       let filtered = [...records];
 
-      // Filter by type
       if (filterType) {
         filtered = filtered.filter(record => record.type === filterType);
       }
 
-      // Search by description
       if (searchDescription) {
         filtered = filtered.filter(record =>
           (record.description || '').toLowerCase().includes(searchDescription.toLowerCase())
         );
       }
 
-      // Filter by date range
       if (dateRange.start || dateRange.end) {
         filtered = filtered.filter(record => {
           const recordDate = new Date(record.date);
@@ -107,14 +105,9 @@ const HealthRecordList = () => {
 
   const handleSave = async updatedRecord => {
     try {
-      console.log('Saving updated record:', updatedRecord);
-      const response = await axios.put(
-        `http://localhost:3000/api/health-records/${updatedRecord._id}`,
-        updatedRecord,
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
-      setRecords(records.map(r => (r._id === response.data._id ? response.data : r)));
+      setRecords(records.map(r => (r._id === updatedRecord._id ? updatedRecord : r)));
       setShowEditModal(false);
+      fetchRecordTypes(); // Refresh types in case they were updated
     } catch (err) {
       console.error('Failed to update record:', err);
     }
@@ -167,11 +160,10 @@ const HealthRecordList = () => {
     e.preventDefault();
     setContextRecord(record);
     
-    // Ensure context menu stays within viewport
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     const menuWidth = 200;
-    const menuHeight = 150; // Increased height due to more menu items
+    const menuHeight = 150;
     let x = e.clientX;
     let y = e.clientY;
 
@@ -190,11 +182,15 @@ const HealthRecordList = () => {
     setShowContextMenu(false);
   };
 
+  const handleRecordUpdated = () => {
+    fetchRecords();
+    fetchRecordTypes();
+  };
+
   return (
     <Container onClick={handleClickOutside}>
       <h1>Записи о здоровье</h1>
 
-      {/* Filters, Search, and Sorting */}
       <Row className="mb-3 align-items-center">
         <Col md={3}>
           <Form.Group>
@@ -235,19 +231,16 @@ const HealthRecordList = () => {
         </Col>
         <Col md={3}>
           <Form.Group>
-            <Form.Label>Сортировка</Form.Label>
-            <Form.Select
-              value={sortOrder}
-              onChange={e => setSortOrder(e.target.value)}
-            >
-              <option value="desc">Сначала новые</option>
-              <option value="asc">Сначала старые</option>
-            </Form.Select>
+            <Form.Label>Дата (по)</Form.Label>
+            <Form.Control
+              type="date"
+              value={dateRange.end}
+              onChange={e => setDateRange({ ...dateRange, end: e.target.value })}
+            />
           </Form.Group>
         </Col>
       </Row>
 
-      {/* Records Table */}
       <Table
         striped
         bordered
@@ -262,7 +255,6 @@ const HealthRecordList = () => {
             <th>Тип</th>
             <th>Описание</th>
             <th>Файлы</th>
-            <th>Действия</th>
           </tr>
         </thead>
         <tbody>
@@ -292,13 +284,11 @@ const HealthRecordList = () => {
                   'Нет файлов'
                 )}
               </td>
-              <td></td>
             </tr>
           ))}
         </tbody>
       </Table>
 
-      {/* Context Menu */}
       {showContextMenu && (
         <Dropdown.Menu
           show
@@ -325,23 +315,30 @@ const HealthRecordList = () => {
         </Dropdown.Menu>
       )}
 
-      {/* Edit Modal */}
       <Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>Редактировать запись</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <HealthRecordForm record={editingRecord} onSave={handleSave} onClose={() => setShowEditModal(false)} />
+          <HealthRecordForm 
+            record={editingRecord} 
+            onSave={handleSave} 
+            onClose={() => setShowEditModal(false)} 
+            onRecordUpdated={handleRecordUpdated}
+          />
         </Modal.Body>
       </Modal>
 
-      {/* Add Record Modal */}
       <Modal show={showAddModal} onHide={() => setShowAddModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>Добавить запись</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <HealthRecordForm setRecords={setRecords} onClose={() => setShowAddModal(false)} />
+          <HealthRecordForm 
+            setRecords={setRecords} 
+            onClose={() => setShowAddModal(false)} 
+            onRecordUpdated={handleRecordUpdated}
+          />
         </Modal.Body>
       </Modal>
     </Container>

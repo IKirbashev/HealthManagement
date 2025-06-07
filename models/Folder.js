@@ -5,7 +5,8 @@ const Schema = mongoose.Schema;
 const FolderSchema = new Schema({
   userId: { type: String, required: true },
   name: { type: String, required: true, maxlength: 50 },
-  parentId: { type: Schema.Types.ObjectId, ref: 'Folder', default: null }, // Reference to parent folder
+  parentId: { type: Schema.Types.ObjectId, ref: 'Folder', default: null },
+  lastModified: { type: Date, default: Date.now },
 });
 
 // Unique index for userId, name, and parentId to prevent duplicate folder names in the same parent
