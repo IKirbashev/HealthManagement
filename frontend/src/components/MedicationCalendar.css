@@ -1,0 +1,37 @@
+-- frontend/src/components/MedicationCalendar.css
+.medication-calendar {
+  margin: 20px auto;
+  max-width: 100%;
+}
+
+.tile-content {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+}
+
+.status {
+  font-size: 12px;
+}
+
+.status.taken {
+  color: green;
+}
+
+.status.missed {
+  color: red;
+}
+
+.status.planned {
+  color: grey;
+}
+
+.react-calendar__tile--active {
+  background: #007bff !important;
+  color: white !important;
+}
+
+.current-day {
+  background: #e0f7fa !important;
+  border: 2px solid #007bff !important;
+}

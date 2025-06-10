@@ -1,0 +1,8 @@
+-- frontend/src/components/MedicationList.css
+.table {
+  margin-top: 20px;
+}
+
+.table tr {
+  cursor: context-menu;
+}
