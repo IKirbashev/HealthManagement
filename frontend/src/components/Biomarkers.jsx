@@ -3,7 +3,11 @@ import { useState, useEffect, useRef } from 'react';
 import { Container, Table, Modal, Dropdown, Form, Row, Col, Alert, Button } from 'react-bootstrap';
 import axios from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { Line } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
 import './Biomarkers.css';
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
 const Biomarkers = () => {
   const [biomarkers, setBiomarkers] = useState([]);
@@ -25,6 +29,8 @@ const Biomarkers = () => {
   const [contextBiomarker, setContextBiomarker] = useState(null);
   const [filterName, setFilterName] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [selectedBiomarker, setSelectedBiomarker] = useState(null);
+  const [biomarkerResults, setBiomarkerResults] = useState([]);
   const unitSelectRef = useRef(null);
   const tableRef = useRef(null);
   const navigate = useNavigate();
@@ -42,9 +48,13 @@ const Biomarkers = () => {
 
   useEffect(() => {
     if (pathname === '/biomarkers' || !pathname.startsWith('/biomarkers/')) {
-      navigate('/biomarkers');
+      setSelectedBiomarker(null);
+    } else {
+      const biomarkerName = decodeURIComponent(pathname.split('/biomarkers/')[1]);
+      setSelectedBiomarker(biomarkerName);
+      fetchBiomarkerResults(biomarkerName);
     }
-  }, [pathname, navigate]);
+  }, [pathname]);
 
   useEffect(() => {
     try {
@@ -78,8 +88,16 @@ const Biomarkers = () => {
       const response = await axios.get('http://localhost:3000/api/biomarkers', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setBiomarkers(response.data);
-      setFilteredBiomarkers(response.data);
+      // Filter to keep only the latest result per biomarker name
+      const latestBiomarkers = response.data.reduce((acc, current) => {
+        const existing = acc.find(b => b.name === current.name);
+        if (!existing || new Date(current.date) > new Date(existing.date)) {
+          return acc.filter(b => b.name !== current.name).concat(current);
+        }
+        return acc;
+      }, []);
+      setBiomarkers(latestBiomarkers);
+      setFilteredBiomarkers(latestBiomarkers);
       setError('');
     } catch (err) {
       console.error('Failed to fetch biomarkers:', err);
@@ -102,6 +120,20 @@ const Biomarkers = () => {
     } catch (err) {
       console.error('Failed to fetch units:', err);
       setError('Не удалось загрузить единицы измерения. Проверьте подключение к серверу.');
+    }
+  };
+
+  const fetchBiomarkerResults = async (name) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`http://localhost:3000/api/biomarkers/${name}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setBiomarkerResults(response.data);
+      setError('');
+    } catch (err) {
+      console.error('Failed to fetch biomarker results:', err);
+      setError('Не удалось загрузить результаты биомаркера.');
     }
   };
 
@@ -131,6 +163,9 @@ const Biomarkers = () => {
       setFormData({ id: '', name: '', date: '', value: '', unit: '', comments: '' });
       setError('');
       fetchBiomarkers();
+      if (selectedBiomarker) {
+        fetchBiomarkerResults(selectedBiomarker);
+      }
     } catch (err) {
       console.error('Failed to add biomarker:', err);
       setError(err.response?.data?.error || 'Ошибка при добавлении биомаркера');
@@ -163,6 +198,9 @@ const Biomarkers = () => {
       setFormData({ id: '', name: '', date: '', value: '', unit: '', comments: '' });
       setError('');
       fetchBiomarkers();
+      if (selectedBiomarker) {
+        fetchBiomarkerResults(selectedBiomarker);
+      }
     } catch (err) {
       console.error('Failed to update biomarker:', err);
       setError(err.response?.data?.error || 'Ошибка при обновлении биомаркера');
@@ -177,6 +215,9 @@ const Biomarkers = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
         fetchBiomarkers();
+        if (selectedBiomarker) {
+          fetchBiomarkerResults(selectedBiomarker);
+        }
         setShowContextMenu(false);
       } catch (err) {
         console.error('Failed to delete biomarker:', err);
@@ -304,148 +345,174 @@ const Biomarkers = () => {
   };
 
   const handleDoubleClick = (name) => {
-    navigate(`/biomarkers/${name}`);
+    navigate(`/biomarkers/${encodeURIComponent(name)}`);
   };
 
-  const BiomarkerDetails = ({ name }) => {
-    const [results, setResults] = useState([]);
-    const [error, setError] = useState('');
+  const chartData = {
+    labels: biomarkerResults.map(result => new Date(result.date).toLocaleDateString()),
+    datasets: [
+      {
+        label: selectedBiomarker,
+        data: biomarkerResults.map(result => result.value),
+        fill: false,
+        borderColor: 'rgb(75, 192, 192)',
+        tension: 0.1,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+      },
+    ],
+  };
 
-    useEffect(() => {
-      fetchResults();
-    }, [name]);
-
-    const fetchResults = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          navigate('/login');
-          return;
-        }
-        const response = await axios.get(`http://localhost:3000/api/biomarkers/${name}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setResults(response.data);
-        setError('');
-      } catch (err) {
-        console.error('Failed to fetch results:', err);
-        setError('Не удалось загрузить результаты. Проверьте подключение к серверу.');
-      }
-    };
-
-    return (
-      <Container>
-        <h1>{name}</h1>
-        {error && <Alert variant="danger">{error}</Alert>}
-        <Table striped bordered hover>
-          <thead>
-            <tr>
-              <th>Дата</th>
-              <th>Значение</th>
-              <th>Единица</th>
-              <th>Комментарии</th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.map((result) => (
-              <tr key={result._id}>
-                <td>{new Date(result.date).toLocaleDateString()}</td>
-                <td>{result.value}</td>
-                <td>{result.unit}</td>
-                <td>{result.comments || '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-        <h2>График</h2>
-        {results.length > 1 && (
-          <div className="biomarker-graph">
-            <canvas id="biomarkerChart"></canvas>
-          </div>
-        )}
-      </Container>
-    );
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top',
+      },
+      title: {
+        display: true,
+        text: `График значений ${selectedBiomarker}`,
+      },
+      tooltip: {
+        callbacks: {
+          label: (context) => {
+            const result = biomarkerResults[context.dataIndex];
+            return `${context.dataset.label}: ${context.parsed.y} ${result.unit} (${new Date(result.date).toLocaleDateString()})`;
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        title: {
+          display: true,
+          text: 'Дата',
+        },
+      },
+      y: {
+        title: {
+          display: true,
+          text: 'Значение',
+        },
+      },
+    },
   };
 
   return (
     <Container onClick={handleClickOutside}>
       <h1>Биомаркеры</h1>
       {error && <Alert variant="danger">{error}</Alert>}
-      <Row className="mb-3 align-items-end">
-        <Col md={3}>
-          <Form.Group>
-            <Form.Label>Фильтр по названию</Form.Label>
-            <Form.Control
-              type="text"
-              placeholder="Введите название"
-              value={filterName}
-              onChange={e => setFilterName(e.target.value)}
-            />
-          </Form.Group>
-        </Col>
-        <Col md={3}>
-          <Form.Group>
-            <Form.Label>Дата (с)</Form.Label>
-            <Form.Control
-              type="date"
-              value={dateRange.start}
-              onChange={e => setDateRange({ ...dateRange, start: e.target.value })}
-            />
-          </Form.Group>
-        </Col>
-        <Col md={3}>
-          <Form.Group>
-            <Form.Label>Дата (по)</Form.Label>
-            <Form.Control
-              type="date"
-              value={dateRange.end}
-              onChange={e => setDateRange({ ...dateRange, end: e.target.value })}
-            />
-          </Form.Group>
-        </Col>
-        <Col md={3} className="d-flex justify-content-end">
-          <Button
-            variant="primary"
-            onClick={() => setShowAddModal(true)}
-          >
-            Добавить биомаркер
-          </Button>
-        </Col>
-      </Row>
+      {!selectedBiomarker ? (
+        <>
+          <Row className="mb-3 align-items-end">
+            <Col md={3}>
+              <Form.Group>
+                <Form.Label>Фильтр по названию</Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="Введите название"
+                  value={filterName}
+                  onChange={e => setFilterName(e.target.value)}
+                />
+              </Form.Group>
+            </Col>
+            <Col md={3}>
+              <Form.Group>
+                <Form.Label>Дата (с)</Form.Label>
+                <Form.Control
+                  type="date"
+                  value={dateRange.start}
+                  onChange={e => setDateRange({ ...dateRange, start: e.target.value })}
+                />
+              </Form.Group>
+            </Col>
+            <Col md={3}>
+              <Form.Group>
+                <Form.Label>Дата (по)</Form.Label>
+                <Form.Control
+                  type="date"
+                  value={dateRange.end}
+                  onChange={e => setDateRange({ ...dateRange, end: e.target.value })}
+                />
+              </Form.Group>
+            </Col>
+            <Col md={3} className="d-flex justify-content-end">
+              <Button
+                variant="primary"
+                onClick={() => setShowAddModal(true)}
+              >
+                Добавить результат
+              </Button>
+            </Col>
+          </Row>
 
-      <Table
-        striped
-        bordered
-        hover
-        ref={tableRef}
-        style={{ userSelect: 'none' }}
-      >
-        <thead>
-          <tr>
-            <th>Название</th>
-            <th>Дата</th>
-            <th>Значение</th>
-            <th>Единица</th>
-            <th>Комментарии</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredBiomarkers.map(biomarker => (
-            <tr
-              key={biomarker._id}
-              onContextMenu={e => handleContextMenu(e, biomarker)}
-              onDoubleClick={() => handleDoubleClick(biomarker.name)}
-              style={{ cursor: 'context-menu' }}
-            >
-              <td>{biomarker.name}</td>
-              <td>{new Date(biomarker.date).toLocaleDateString()}</td>
-              <td>{biomarker.value}</td>
-              <td>{biomarker.unit}</td>
-              <td>{biomarker.comments || '-'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
+          <Table
+            striped
+            bordered
+            hover
+            ref={tableRef}
+            style={{ userSelect: 'none' }}
+          >
+            <thead>
+              <tr>
+                <th>Название</th>
+                <th>Дата</th>
+                <th>Значение</th>
+                <th>Единица</th>
+                <th>Комментарии</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredBiomarkers.map(biomarker => (
+                <tr
+                  key={biomarker._id}
+                  onContextMenu={e => handleContextMenu(e, biomarker)}
+                  onDoubleClick={() => handleDoubleClick(biomarker.name)}
+                  style={{ cursor: 'context-menu' }}
+                >
+                  <td>{biomarker.name}</td>
+                  <td>{new Date(biomarker.date).toLocaleDateString()}</td>
+                  <td>{biomarker.value}</td>
+                  <td>{biomarker.unit}</td>
+                  <td>{biomarker.comments || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </>
+      ) : (
+        <Container>
+          <Button variant="secondary" onClick={() => navigate('/biomarkers')} className="mb-3">
+            Назад к списку
+          </Button>
+          <h2>{selectedBiomarker}</h2>
+          <Table striped bordered hover>
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Значение</th>
+                <th>Единица</th>
+                <th>Комментарии</th>
+              </tr>
+            </thead>
+            <tbody>
+              {biomarkerResults.map(result => (
+                <tr key={result._id}>
+                  <td>{new Date(result.date).toLocaleDateString()}</td>
+                  <td>{result.value}</td>
+                  <td>{result.unit}</td>
+                  <td>{result.comments || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+          {biomarkerResults.length > 0 && (
+            <div className="biomarker-graph">
+              <Line data={chartData} options={chartOptions} />
+            </div>
+          )}
+        </Container>
+      )}
 
       {showContextMenu && (
         <Dropdown.Menu
@@ -457,8 +524,11 @@ const Biomarkers = () => {
             zIndex: 1000,
           }}
         >
-          <Dropdown.Item onClick={() => setShowAddModal(true)}>
-            Добавить биомаркер
+          <Dropdown.Item onClick={() => {
+            setFormData({ ...formData, name: contextBiomarker?.name || '' });
+            setShowAddModal(true);
+          }}>
+            Добавить результат
           </Dropdown.Item>
           {contextBiomarker && (
             <>
@@ -486,7 +556,7 @@ const Biomarkers = () => {
 
       <Modal show={showAddModal} onHide={() => setShowAddModal(false)}>
         <Modal.Header closeButton>
-          <Modal.Title>Добавить биомаркер</Modal.Title>
+          <Modal.Title>Добавить результат</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form onSubmit={handleAddBiomarker}>
@@ -553,7 +623,7 @@ const Biomarkers = () => {
 
       <Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
         <Modal.Header closeButton>
-          <Modal.Title>Редактировать биомаркер</Modal.Title>
+          <Modal.Title>Редактировать результат</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form onSubmit={handleEditBiomarker}>

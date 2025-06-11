@@ -33,12 +33,12 @@ function App() {
               <Nav.Link as={Link} to="/health-records">Записи о здоровье</Nav.Link>
               <Nav.Link as={Link} to="/medications">Медикаменты</Nav.Link>
               <Nav.Link as={Link} to="/medication-calendar">Календарь приёма</Nav.Link>
+              <Nav.Link as={Link} to="/biomarkers">Биомаркеры</Nav.Link>
               <Nav.Link as={Link} to="/documents">Документы</Nav.Link>
-              <Nav.Link as={Link} to="/biomarkers">Биомаркеры</Nav.Link> {/* Add Biomarkers link */}
             </Nav>
             <Nav>
               {localStorage.getItem('token') ? (
-                <NavDropdown title="Аккаунт" id="basic-nav-dropdown">
+                <NavDropdown title="👤 Личный кабинет " id="basic-nav-dropdown">
                   <NavDropdown.Item as={Link} to="/account">Аккаунт</NavDropdown.Item>
                   <NavDropdown.Item onClick={handleLogout}>Выйти</NavDropdown.Item>
                 </NavDropdown>
