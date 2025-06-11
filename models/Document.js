@@ -10,7 +10,6 @@ const DocumentSchema = new Schema({
   folderId: { type: Schema.Types.ObjectId, ref: 'Folder', default: null }, // Reference to folder
   uploadDate: { type: Date, default: Date.now },
   relatedRecordId: { type: Schema.Types.ObjectId, ref: 'HealthRecord' },
-  relatedBiomarkerResultId: { type: Schema.Types.ObjectId, ref: 'BiomarkerResult' },
 });
 
 module.exports = mongoose.model('Document', DocumentSchema);

@@ -11,9 +11,8 @@ const path = require('path');
 const authRoutes = require('./routes/auth');
 const healthRecordRoutes = require('./routes/healthRecords');
 const medicationRoutes = require('./routes/medications');
-const biomarkerRoutes = require('./routes/biomarkers');
 const documentRoutes = require('./routes/documents');
-const ocrRoutes = require('./routes/ocr');
+const biomarkerRoutes = require('./routes/biomarkers');
 
 const app = express();
 
@@ -27,15 +26,14 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(passport.initialize());
-app.use('/uploads', express.static(path.join(__dirname, 'Uploads')));
+app.use('/Uploads', express.static(path.join(__dirname, 'Uploads')));
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/health-records', healthRecordRoutes);
 app.use('/api/medications', medicationRoutes);
-app.use('/api/biomarkers', biomarkerRoutes);
 app.use('/api/documents', documentRoutes);
-app.use('/api/ocr', ocrRoutes);
+app.use('/api', biomarkerRoutes);
 
 // Start Server
 const PORT = process.env.PORT || 3000;

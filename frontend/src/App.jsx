@@ -4,12 +4,12 @@ import { Navbar, Nav, Container, NavDropdown } from 'react-bootstrap';
 import HealthRecordList from './components/HealthRecordList';
 import MedicationCalendar from './components/MedicationCalendar';
 import MedicationList from './components/MedicationList';
-import BiomarkerTable from './components/BiomarkerTable';
 import DocumentList from './components/DocumentList';
 import Login from './components/Login';
 import Register from './components/Register';
 import AccountMenu from './components/AccountMenu';
 import ErrorBoundary from './components/ErrorBoundary';
+import Biomarkers from './components/Biomarkers'; // Import the Biomarkers component
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -33,8 +33,8 @@ function App() {
               <Nav.Link as={Link} to="/health-records">Записи о здоровье</Nav.Link>
               <Nav.Link as={Link} to="/medications">Медикаменты</Nav.Link>
               <Nav.Link as={Link} to="/medication-calendar">Календарь приёма</Nav.Link>
-              <Nav.Link as={Link} to="/biomarkers">Биомаркеры</Nav.Link>
               <Nav.Link as={Link} to="/documents">Документы</Nav.Link>
+              <Nav.Link as={Link} to="/biomarkers">Биомаркеры</Nav.Link> {/* Add Biomarkers link */}
             </Nav>
             <Nav>
               {localStorage.getItem('token') ? (
@@ -61,9 +61,9 @@ function App() {
             <Route path="/health-records" element={<ProtectedRoute><HealthRecordList /></ProtectedRoute>} />
             <Route path="/medications" element={<ProtectedRoute><MedicationList /></ProtectedRoute>} />
             <Route path="/medication-calendar" element={<ProtectedRoute><MedicationCalendar /></ProtectedRoute>} />
-            <Route path="/biomarkers" element={<ProtectedRoute><BiomarkerTable /></ProtectedRoute>} />
             <Route path="/documents" element={<ProtectedRoute><DocumentList /></ProtectedRoute>} />
             <Route path="/account" element={<ProtectedRoute><AccountMenu /></ProtectedRoute>} />
+            <Route path="/biomarkers/*" element={<ProtectedRoute><Biomarkers /></ProtectedRoute>} /> {/* Add Biomarkers route */}
             <Route path="/" element={<Navigate to="/health-records" />} />
           </Routes>
         </ErrorBoundary>
